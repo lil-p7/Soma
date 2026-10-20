@@ -1,111 +1,500 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --bg: #0b0f17;
+  --panel: #141a25;
+  --panel-2: #1b2331;
+  --border: #263041;
+  --text: #dbe3f0;
+  --muted: #93a1b8;
+  --accent: #38bdf8;
+  --good: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --neutral: #94a3b8;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Glow tints used by the animated backgrounds and state highlights. */
+  --accent-glow: rgba(56, 189, 248, 0.12);
+  --good-glow: rgba(52, 211, 153, 0.1);
+  --warn-glow: rgba(251, 191, 36, 0.12);
+  --bad-glow: rgba(248, 113, 113, 0.1);
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
   color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  background-color: var(--bg);
+  color-scheme: dark;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, var(--accent-glow), transparent),
+    var(--bg);
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
+  min-height: 100vh;
+}
+
+/* --------------------------------------------------------------------- */
+/* Keyframes                                                              */
+/* --------------------------------------------------------------------- */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes bounce-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(56, 189, 248, 0.35); }
+  50% { box-shadow: 0 0 24px rgba(56, 189, 248, 0.6); }
+}
+
+@keyframes success-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(251, 191, 36, 0.25); }
+  50% { box-shadow: 0 0 22px rgba(251, 191, 36, 0.45); }
+}
+
+/*
+ * Alert banner: one entrance bounce, then an infinite glow pulse. Combined
+ * into a single class because two animation-shorthand utilities on one element
+ * would just overwrite each other.
+ */
+.animate-alert {
+  animation:
+    bounce-in 0.4s ease-out both,
+    success-glow 2s ease-in-out 0.4s infinite;
+}
+
+/* --------------------------------------------------------------------- */
+/* Animation utility classes (referenced from App.jsx)                    */
+/* --------------------------------------------------------------------- */
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-bounce {
+  animation: bounce 2s ease-in-out infinite;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.5s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-success-glow {
+  animation: success-glow 2s ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------- */
+/* Layout                                                                 */
+/* --------------------------------------------------------------------- */
+
+.app {
+  max-width: 1120px;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  padding: 32px 20px 48px;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
+  gap: 20px;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+.app-header h1 {
   margin: 0;
+  font-size: 34px;
+  letter-spacing: -0.5px;
+  color: #f8fafc;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+.tagline {
+  margin: 4px 0 0;
+  color: var(--muted);
+  max-width: 46ch;
+  font-size: 14px;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* --------------------------------------------------------------------- */
+/* State badge                                                            */
+/* --------------------------------------------------------------------- */
+
+.state-badge {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-good {
+  color: var(--good);
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.state-warning {
+  color: var(--warn);
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.state-calibrating {
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.state-no_pose {
+  color: var(--bad);
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+/* --------------------------------------------------------------------- */
+/* Alert banner                                                           */
+/* --------------------------------------------------------------------- */
+
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+  font-size: 14px;
+}
+
+.alert-banner strong {
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------- */
+/* Main grid                                                              */
+/* --------------------------------------------------------------------- */
+
+.app-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .app-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --------------------------------------------------------------------- */
+/* Camera panel                                                           */
+/* --------------------------------------------------------------------- */
+
+.camera-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.camera-stage {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #05070b;
+  aspect-ratio: 4 / 3;
+}
+
+.camera-video,
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+}
+
+.camera-video {
+  object-fit: cover;
+}
+
+.camera-video.is-hidden {
+  visibility: hidden;
+}
+
+.camera-overlay {
+  pointer-events: none;
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted);
+  text-align: center;
+  padding: 24px;
+}
+
+.camera-placeholder p {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.camera-placeholder span {
+  font-size: 13px;
+}
+
+.camera-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(5, 7, 11, 0.7);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.camera-error {
+  margin: 0;
+  color: var(--bad);
+  font-size: 14px;
+}
+
+.camera-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* --------------------------------------------------------------------- */
+/* Buttons                                                                */
+/* --------------------------------------------------------------------- */
+
+.btn {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #04121c;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-secondary {
+  background: var(--panel-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #232c3c;
+}
+
+/* --------------------------------------------------------------------- */
+/* Side panel                                                             */
+/* --------------------------------------------------------------------- */
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  transition: border-color 0.3s ease;
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.card-error {
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+.card-muted {
+  background: rgba(20, 26, 37, 0.6);
+}
+
+/* --------------------------------------------------------------------- */
+/* Posture status                                                         */
+/* --------------------------------------------------------------------- */
+
+.posture-message {
+  margin: 0;
+  font-size: 17px;
+  color: var(--text);
+  transition: color 0.3s ease;
+}
+
+.posture-good {
+  color: var(--good);
+}
+
+.posture-warning {
+  color: var(--warn);
+}
+
+.posture-no_pose {
+  color: var(--bad);
+}
+
+.issue-tag {
+  margin: 8px 0 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.progress {
+  margin-top: 12px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.stats dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stats dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: #f1f5f9;
+}
+
+.card-actions {
+  margin-top: 16px;
+}
+
+.hint-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-footer {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-bounce,
+  .animate-bounce-in,
+  .animate-fade-in,
+  .animate-pulse-glow,
+  .animate-success-glow,
+  .animate-alert {
+    animation: none;
+  }
 }

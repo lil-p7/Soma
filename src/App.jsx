@@ -1,88 +1,224 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import CameraPanel from "./components/CameraPanel";
+import { useWebcam } from "./hooks/useWebcam";
 import { usePoseLandmarker } from "./hooks/usePoseLandmarker";
 import { usePostureStateMachine } from "./hooks/usePostureStateMachine";
 import "./index.css";
 
-function App() {
-  const { landmarks, confidence, error, detectFromVideo } = usePoseLandmarker();
-  
-  // Initialize posture state machine with custom settings
-  const posture = usePostureStateMachine({
-    alertDelay: 5,           // 5 seconds before alert triggers
-    cooldown: 10,           // 10 seconds cooldown between alerts
-    forwardLeanThreshold: 12,    // 12 degrees forward lean threshold
-    torsoInclinationThreshold: 12, // 12 degrees slouching threshold
-    shoulderTiltThreshold: 10,   // 10 degrees shoulder tilt threshold
-    recoveryThreshold: 2,     // 2 degrees to recover from warning
-  });
+/* CSS custom properties and animation classes are loaded from index.css */
 
-  // Process landmarks from MediaPipe
+const SETTINGS = {
+  alertDelay: 5, // seconds before a sustained issue raises an alert
+  cooldown: 10, // seconds between alerts
+  forwardLeanThreshold: 12, // degrees from baseline
+  torsoInclinationThreshold: 12, // degrees from baseline
+  shoulderTiltThreshold: 10, // degrees from baseline
+  recoveryThreshold: 2, // degrees to return to "good"
+  calibrationSeconds: 3, // neutral baseline capture time
+};
+
+const STATE_LABELS = {
+  CALIBRATING: "Calibrating",
+  GOOD: "Good posture",
+  WARNING: "Check your posture",
+  NO_POSE: "No pose detected",
+  PAUSED: "Paused",
+};
+
+function App() {
+  const webcam = useWebcam();
+  const pose = usePoseLandmarker();
+  const posture = usePostureStateMachine(SETTINGS);
+
+  const {
+    active,
+    videoRef,
+    startCamera,
+    stopCamera, 
+    error: cameraError,
+  } = webcam;
+  const { status: poseStatus, error: poseError, detect, landmarksRef } = pose;
+  const {
+    startCalibration,
+    pauseMonitoring,
+    resetCalibration,
+    processLandmarks,
+    state: postureState,
+    message,
+    issue,
+    shouldAlert,
+    formatElapsed,
+    progress,
+    baselineCount,
+  } = posture;
+
+  // Calibration starts with the camera, and monitoring stops with it.
   useEffect(() => {
-    const processLandmarks = (videoElement) => {
-      if (!videoElement || !landmarks) return;
-      
-      // Detect pose from video element
-      detectFromVideo(videoElement);
-      
-      // If we have landmarks, process them through the state machine
-      if (landmarks && landmarks.length > 0) {
-        posture.processLandmarks(landmarks);
+    if (active) {
+      startCalibration();
+    } else {
+      pauseMonitoring();
+    }
+  }, [active, startCalibration, pauseMonitoring]);
+
+  // Single detection loop: runs only while the camera and the model are ready.
+  useEffect(() => {
+    if (!active || poseStatus !== "ready") return;
+
+    let frameId = 0;
+    let stopped = false;
+
+    const tick = () => {
+      if (stopped) return;
+
+      const video = videoRef.current;
+      if (video && video.readyState >= 2 && video.videoWidth > 0) {
+        // Passing null marks the pose as unavailable for this frame.
+        processLandmarks(detect(video) || null);
       }
+
+      frameId = requestAnimationFrame(tick);
     };
 
-    // We'll handle frame processing in the CameraPanel
-  }, [landmarks, detectFromVideo, posture]);
+    tick();
 
-  const toggleMonitoring = () => {
-    // Toggle monitoring - this will reset calibration state if needed
-    // The posture state machine handles its own state
-  };
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [active, poseStatus, detect, processLandmarks, videoRef]);
+
+  // Keep an alert visible for a few seconds instead of one frame.
+  const [alertMessage, setAlertMessage] = useState(null);
+  const alertTimerRef = useRef(0);
+
+  useEffect(() => {
+    if (!shouldAlert) return;
+    setAlertMessage(message);
+    clearTimeout(alertTimerRef.current);
+    alertTimerRef.current = setTimeout(() => setAlertMessage(null), 6000);
+  }, [shouldAlert, message]);
+
+  useEffect(() => () => clearTimeout(alertTimerRef.current), []);
+
+  const statusText = STATE_LABELS[postureState] || postureState;
 
   return (
     <div className="app">
-      <header>
-        <h1>Soma - Posture Correction Tool</h1>
-        <div className="controls">
-          <button onClick={toggleMonitoring} disabled={posture.state === "NO_POSE"}>
-            {posture.state === "CALIBRATING" ? "Calibrating..." : 
-              posture.state === "GOOD" || posture.state === "WARNING"
-                ? (posture.shouldAlert ? "Alert Active!" : "Monitoring")
-                : "Pause"}
-          </button>
-          {error && <p className="error">{error}</p>}
+      <header className="app-header">
+        <div>
+          <h1>Soma</h1>
+          <p className="tagline">
+            Posture awareness from your webcam. Everything runs locally in your
+            browser.
+          </p>
+        </div>
+        <div className={`state-badge state-${postureState.toLowerCase()} ${postureState === 'CALIBRATING' ? 'animate-pulse' : postureState === 'WARNING' ? 'animate-bounce' : ''}`}>
+          {statusText}
         </div>
       </header>
 
-      <main>
-        <CameraPanel onFrame={detectFromVideo} />
-        
-        {landmarks && landmarks.length > 0 && (
-          <div className="landmark-overlay">
-            <p>Landmarks detected: {landmarks.length}</p>
-            <p>Average confidence: {confidence.toFixed(2)}</p>
-          </div>
-        )}
-        
-        {/* Posture Status Display */}
-        <section className="posture-status">
-          <h2>Current Posture</h2>
-          <div className={`status-indicator ${posture.state}`}>
-            <span>{posture.message}</span>
-          </div>
-          
-          {posture.issue && (
-            <p className="issue-detail">{posture.message}</p>
+      {alertMessage && (
+        <div role="alert" className="alert-banner animate-alert">
+          <strong>Posture alert</strong>
+          <span>{alertMessage}</span>
+        </div>
+      )}
+
+      <main className="app-main animate-bounce-in">
+        <CameraPanel
+          videoRef={videoRef}
+          landmarksRef={landmarksRef}
+          active={active}
+          error={cameraError}
+          onStart={startCamera}
+          onStop={stopCamera}
+          statusText={
+            poseStatus === "ready"
+              ? pose.visible
+                ? "Pose detected"
+                : "Move into frame"
+              : poseStatus === "loading"
+                ? "Loading pose model..."
+                : "Pose model failed"
+          }
+        />
+
+        <aside className="side-panel animate-fade-in">
+          <section className="card">
+            <h2>Current posture</h2>
+            <p className={`posture-message posture-${postureState.toLowerCase()}`}>
+              {message}
+            </p>
+            {issue && (
+              <p className="issue-tag">
+                Indicator: {issue.replaceAll("_", " ").toLowerCase()}
+              </p>
+            )}
+
+            {postureState === "CALIBRATING" && (
+              <div className="progress animate-pulse-glow">
+                <div
+                  className="progress-bar"
+                  style={{ width: `${Math.round(progress * 100)}%` }}
+                />
+              </div>
+            )}
+
+            <dl className="stats">
+              <div>
+                <dt>Monitoring time</dt>
+                <dd>{formatElapsed}</dd>
+              </div>
+              <div>
+                <dt>Baselines recorded</dt>
+                <dd>{baselineCount}</dd>
+              </div>
+              <div>
+                <dt>Pose model</dt>
+                <dd>{poseStatus === "ready" ? "Ready" : poseStatus}</dd>
+              </div>
+            </dl>
+
+            <div className="card-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={resetCalibration}
+                disabled={!active}
+              >
+                Recalibrate
+              </button>
+            </div>
+          </section>
+
+          {poseError && (
+            <section className="card card-error">
+              <h2>Pose engine</h2>
+              <p>{poseError}</p>
+            </section>
           )}
-        </section>
-        
-        {/* Session stats (basic) */}
-        <section className="session-stats">
-          <h3>Session</h3>
-          <p>Monitoring time: {posture.formatElapsed}</p>
-          <p>State: {posture.state}</p>
-        </section>
+
+          <section className="card card-muted">
+            <h2>How it works</h2>
+            <ol className="hint-list">
+              <li>Start the camera and hold your normal sitting position for 3 seconds.</li>
+              <li>
+                Soma stores that as your neutral baseline and compares every frame
+                against it.
+              </li>
+              <li>
+                Forward lean, slouching and uneven shoulders are flagged after 5
+                seconds of sustained deviation.
+              </li>
+            </ol>
+          </section>
+        </aside>
       </main>
+
+      <footer className="app-footer">
+        Posture feedback only - not a medical device.
+      </footer>
     </div>
   );
 }

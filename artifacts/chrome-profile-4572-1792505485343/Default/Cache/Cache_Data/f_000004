@@ -1,0 +1,373 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/App.jsx");const useEffect = __vite__cjsImport0_react["useEffect"]; const useRef = __vite__cjsImport0_react["useRef"]; const useState = __vite__cjsImport0_react["useState"];const _jsxDEV = __vite__cjsImport6_react_jsxDevRuntime["jsxDEV"];import __vite__cjsImport0_react from "/node_modules/.vite/deps/react.js?v=7e938769";
+import CameraPanel from "/src/components/CameraPanel.jsx";
+import { useWebcam } from "/src/hooks/useWebcam.js";
+import { usePoseLandmarker } from "/src/hooks/usePoseLandmarker.js";
+import { usePostureStateMachine } from "/src/hooks/usePostureStateMachine.js?t=1792505196207";
+import "/src/index.css?t=1792505259698";
+var _jsxFileName = "C:/Users/Administrator/Documents/Tech/soma/soma/src/App.jsx";
+import __vite__cjsImport6_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=7e938769";
+var _s = $RefreshSig$();
+/* CSS custom properties and animation classes are loaded from index.css */
+const SETTINGS = {
+	alertDelay: 5,
+	cooldown: 10,
+	forwardLeanThreshold: 12,
+	torsoInclinationThreshold: 12,
+	shoulderTiltThreshold: 10,
+	recoveryThreshold: 2,
+	calibrationSeconds: 3
+};
+const STATE_LABELS = {
+	CALIBRATING: "Calibrating",
+	GOOD: "Good posture",
+	WARNING: "Check your posture",
+	NO_POSE: "No pose detected",
+	PAUSED: "Paused"
+};
+function App() {
+	_s();
+	const webcam = useWebcam();
+	const pose = usePoseLandmarker();
+	const posture = usePostureStateMachine(SETTINGS);
+	const { active, videoRef, startCamera, stopCamera, error: cameraError } = webcam;
+	const { status: poseStatus, error: poseError, detect, landmarksRef } = pose;
+	const { startCalibration, pauseMonitoring, resetCalibration, processLandmarks, state: postureState, message, issue, shouldAlert, formatElapsed, progress, baselineCount } = posture;
+	// Calibration starts with the camera, and monitoring stops with it.
+	useEffect(() => {
+		if (active) {
+			startCalibration();
+		} else {
+			pauseMonitoring();
+		}
+	}, [
+		active,
+		startCalibration,
+		pauseMonitoring
+	]);
+	// Single detection loop: runs only while the camera and the model are ready.
+	useEffect(() => {
+		if (!active || poseStatus !== "ready") return;
+		let frameId = 0;
+		let stopped = false;
+		const tick = () => {
+			if (stopped) return;
+			const video = videoRef.current;
+			if (video && video.readyState >= 2 && video.videoWidth > 0) {
+				// Passing null marks the pose as unavailable for this frame.
+				processLandmarks(detect(video) || null);
+			}
+			frameId = requestAnimationFrame(tick);
+		};
+		tick();
+		return () => {
+			stopped = true;
+			cancelAnimationFrame(frameId);
+		};
+	}, [
+		active,
+		poseStatus,
+		detect,
+		processLandmarks,
+		videoRef
+	]);
+	// Keep an alert visible for a few seconds instead of one frame.
+	const [alertMessage, setAlertMessage] = useState(null);
+	const alertTimerRef = useRef(0);
+	useEffect(() => {
+		if (!shouldAlert) return;
+		setAlertMessage(message);
+		clearTimeout(alertTimerRef.current);
+		alertTimerRef.current = setTimeout(() => setAlertMessage(null), 6e3);
+	}, [shouldAlert, message]);
+	useEffect(() => () => clearTimeout(alertTimerRef.current), []);
+	const statusText = STATE_LABELS[postureState] || postureState;
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "app",
+		children: [
+			/* @__PURE__ */ _jsxDEV("header", {
+				className: "app-header",
+				children: [/* @__PURE__ */ _jsxDEV("div", { children: [/* @__PURE__ */ _jsxDEV("h1", { children: "Soma" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 110,
+					columnNumber: 11
+				}, this), /* @__PURE__ */ _jsxDEV("p", {
+					className: "tagline",
+					children: "Posture awareness from your webcam. Everything runs locally in your browser."
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 111,
+					columnNumber: 11
+				}, this)] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 109,
+					columnNumber: 9
+				}, this), /* @__PURE__ */ _jsxDEV("div", {
+					className: `state-badge state-${postureState.toLowerCase()} ${postureState === "CALIBRATING" ? "animate-pulse" : postureState === "WARNING" ? "animate-bounce" : ""}`,
+					children: statusText
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 116,
+					columnNumber: 9
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 108,
+				columnNumber: 7
+			}, this),
+			alertMessage && /* @__PURE__ */ _jsxDEV("div", {
+				role: "alert",
+				className: "alert-banner animate-alert",
+				children: [/* @__PURE__ */ _jsxDEV("strong", { children: "Posture alert" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 123,
+					columnNumber: 11
+				}, this), /* @__PURE__ */ _jsxDEV("span", { children: alertMessage }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 124,
+					columnNumber: 11
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 122,
+				columnNumber: 9
+			}, this),
+			/* @__PURE__ */ _jsxDEV("main", {
+				className: "app-main animate-bounce-in",
+				children: [/* @__PURE__ */ _jsxDEV(CameraPanel, {
+					videoRef,
+					landmarksRef,
+					active,
+					error: cameraError,
+					onStart: startCamera,
+					onStop: stopCamera,
+					statusText: poseStatus === "ready" ? pose.visible ? "Pose detected" : "Move into frame" : poseStatus === "loading" ? "Loading pose model..." : "Pose model failed"
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 129,
+					columnNumber: 9
+				}, this), /* @__PURE__ */ _jsxDEV("aside", {
+					className: "side-panel animate-fade-in",
+					children: [
+						/* @__PURE__ */ _jsxDEV("section", {
+							className: "card",
+							children: [
+								/* @__PURE__ */ _jsxDEV("h2", { children: "Current posture" }, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 149,
+									columnNumber: 13
+								}, this),
+								/* @__PURE__ */ _jsxDEV("p", {
+									className: `posture-message posture-${postureState.toLowerCase()}`,
+									children: message
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 150,
+									columnNumber: 13
+								}, this),
+								issue && /* @__PURE__ */ _jsxDEV("p", {
+									className: "issue-tag",
+									children: ["Indicator: ", issue.replaceAll("_", " ").toLowerCase()]
+								}, void 0, true, {
+									fileName: _jsxFileName,
+									lineNumber: 154,
+									columnNumber: 15
+								}, this),
+								postureState === "CALIBRATING" && /* @__PURE__ */ _jsxDEV("div", {
+									className: "progress animate-pulse-glow",
+									children: /* @__PURE__ */ _jsxDEV("div", {
+										className: "progress-bar",
+										style: { width: `${Math.round(progress * 100)}%` }
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 161,
+										columnNumber: 17
+									}, this)
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 160,
+									columnNumber: 15
+								}, this),
+								/* @__PURE__ */ _jsxDEV("dl", {
+									className: "stats",
+									children: [
+										/* @__PURE__ */ _jsxDEV("div", { children: [/* @__PURE__ */ _jsxDEV("dt", { children: "Monitoring time" }, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 170,
+											columnNumber: 17
+										}, this), /* @__PURE__ */ _jsxDEV("dd", { children: formatElapsed }, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 171,
+											columnNumber: 17
+										}, this)] }, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 169,
+											columnNumber: 15
+										}, this),
+										/* @__PURE__ */ _jsxDEV("div", { children: [/* @__PURE__ */ _jsxDEV("dt", { children: "Baselines recorded" }, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 174,
+											columnNumber: 17
+										}, this), /* @__PURE__ */ _jsxDEV("dd", { children: baselineCount }, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 175,
+											columnNumber: 17
+										}, this)] }, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 173,
+											columnNumber: 15
+										}, this),
+										/* @__PURE__ */ _jsxDEV("div", { children: [/* @__PURE__ */ _jsxDEV("dt", { children: "Pose model" }, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 178,
+											columnNumber: 17
+										}, this), /* @__PURE__ */ _jsxDEV("dd", { children: poseStatus === "ready" ? "Ready" : poseStatus }, void 0, false, {
+											fileName: _jsxFileName,
+											lineNumber: 179,
+											columnNumber: 17
+										}, this)] }, void 0, true, {
+											fileName: _jsxFileName,
+											lineNumber: 177,
+											columnNumber: 15
+										}, this)
+									]
+								}, void 0, true, {
+									fileName: _jsxFileName,
+									lineNumber: 168,
+									columnNumber: 13
+								}, this),
+								/* @__PURE__ */ _jsxDEV("div", {
+									className: "card-actions",
+									children: /* @__PURE__ */ _jsxDEV("button", {
+										type: "button",
+										className: "btn btn-secondary",
+										onClick: resetCalibration,
+										disabled: !active,
+										children: "Recalibrate"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 184,
+										columnNumber: 15
+									}, this)
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 183,
+									columnNumber: 13
+								}, this)
+							]
+						}, void 0, true, {
+							fileName: _jsxFileName,
+							lineNumber: 148,
+							columnNumber: 11
+						}, this),
+						poseError && /* @__PURE__ */ _jsxDEV("section", {
+							className: "card card-error",
+							children: [/* @__PURE__ */ _jsxDEV("h2", { children: "Pose engine" }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 197,
+								columnNumber: 15
+							}, this), /* @__PURE__ */ _jsxDEV("p", { children: poseError }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 198,
+								columnNumber: 15
+							}, this)]
+						}, void 0, true, {
+							fileName: _jsxFileName,
+							lineNumber: 196,
+							columnNumber: 13
+						}, this),
+						/* @__PURE__ */ _jsxDEV("section", {
+							className: "card card-muted",
+							children: [/* @__PURE__ */ _jsxDEV("h2", { children: "How it works" }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 203,
+								columnNumber: 13
+							}, this), /* @__PURE__ */ _jsxDEV("ol", {
+								className: "hint-list",
+								children: [
+									/* @__PURE__ */ _jsxDEV("li", { children: "Start the camera and hold your normal sitting position for 3 seconds." }, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 205,
+										columnNumber: 15
+									}, this),
+									/* @__PURE__ */ _jsxDEV("li", { children: "Soma stores that as your neutral baseline and compares every frame against it." }, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 206,
+										columnNumber: 15
+									}, this),
+									/* @__PURE__ */ _jsxDEV("li", { children: "Forward lean, slouching and uneven shoulders are flagged after 5 seconds of sustained deviation." }, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 210,
+										columnNumber: 15
+									}, this)
+								]
+							}, void 0, true, {
+								fileName: _jsxFileName,
+								lineNumber: 204,
+								columnNumber: 13
+							}, this)]
+						}, void 0, true, {
+							fileName: _jsxFileName,
+							lineNumber: 202,
+							columnNumber: 11
+						}, this)
+					]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 147,
+					columnNumber: 9
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 128,
+				columnNumber: 7
+			}, this),
+			/* @__PURE__ */ _jsxDEV("footer", {
+				className: "app-footer",
+				children: "Posture feedback only - not a medical device."
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 219,
+				columnNumber: 7
+			}, this)
+		]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 107,
+		columnNumber: 5
+	}, this);
+}
+_s(App, "AktpwZjYJ4q2F5ObqVjK4NkNpbI=", false, function() {
+	return [
+		useWebcam,
+		usePoseLandmarker,
+		usePostureStateMachine
+	];
+});
+_c = App;
+export default App;
+var _c;
+$RefreshReg$(_c, "App");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/App.jsx?t=1792505259698";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/Administrator/Documents/Tech/soma/soma/src/App.jsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/Administrator/Documents/Tech/soma/soma/src/App.jsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Users/Administrator/Documents/Tech/soma/soma/src/App.jsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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Qyx3QkFBQyxXQUFEO09BQVMsV0FBVTtpQkFBbkIsQ0FDRSx3QkFBQyxNQUFELFlBQUksY0FBZTs7OztpQkFDbkIsd0JBQUMsS0FBRCxZQUFJLFVBQWE7Ozs7ZUFDVjs7Ozs7O01BR1gsd0JBQUMsV0FBRDtPQUFTLFdBQVU7aUJBQW5CLENBQ0Usd0JBQUMsTUFBRCxZQUFJLGVBQWdCOzs7O2lCQUNwQix3QkFBQyxNQUFEO1FBQUksV0FBVTtrQkFBZDtTQUNFLHdCQUFDLE1BQUQsWUFBSSx3RUFBeUU7Ozs7O1NBQzdFLHdCQUFDLE1BQUQsWUFBSSxpRkFHQTs7Ozs7U0FDSix3QkFBQyxNQUFELFlBQUksbUdBR0E7Ozs7O1FBQ0Y7Ozs7O2VBQ0c7Ozs7OztLQUNKOzs7OztZQUNIOzs7Ozs7R0FFTix3QkFBQyxVQUFEO0lBQVEsV0FBVTtjQUFhO0dBRXZCOzs7OztFQUNMOzs7Ozs7QUFFVDs7Ozs7Ozs7O0FBRUEsZUFBZSIsIm5hbWVzIjpbXSwic291cmNlcyI6WyJBcHAuanN4Il0sInZlcnNpb24iOjMsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IHVzZUVmZmVjdCwgdXNlUmVmLCB1c2VTdGF0ZSB9IGZyb20gXCJyZWFjdFwiO1xuaW1wb3J0IENhbWVyYVBhbmVsIGZyb20gXCIuL2NvbXBvbmVudHMvQ2FtZXJhUGFuZWxcIjtcbmltcG9ydCB7IHVzZVdlYmNhbSB9IGZyb20gXCIuL2hvb2tzL3VzZVdlYmNhbVwiO1xuaW1wb3J0IHsgdXNlUG9zZUxhbmRtYXJrZXIgfSBmcm9tIFwiLi9ob29rcy91c2VQb3NlTGFuZG1hcmtlclwiO1xuaW1wb3J0IHsgdXNlUG9zdHVyZVN0YXRlTWFjaGluZSB9IGZyb20gXCIuL2hvb2tzL3VzZVBvc3R1cmVTdGF0ZU1hY2hpbmVcIjtcbmltcG9ydCBcIi4vaW5kZXguY3NzXCI7XG5cbi8qIENTUyBjdXN0b20gcHJvcGVydGllcyBhbmQgYW5pbWF0aW9uIGNsYXNzZXMgYXJlIGxvYWRlZCBmcm9tIGluZGV4LmNzcyAqL1xuXG5jb25zdCBTRVRUSU5HUyA9IHtcbiAgYWxlcnREZWxheTogNSwgLy8gc2Vjb25kcyBiZWZvcmUgYSBzdXN0YWluZWQgaXNzdWUgcmFpc2VzIGFuIGFsZXJ0XG4gIGNvb2xkb3duOiAxMCwgLy8gc2Vjb25kcyBiZXR3ZWVuIGFsZXJ0c1xuICBmb3J3YXJkTGVhblRocmVzaG9sZDogMTIsIC8vIGRlZ3JlZXMgZnJvbSBiYXNlbGluZVxuICB0b3Jzb0luY2xpbmF0aW9uVGhyZXNob2xkOiAxMiwgLy8gZGVncmVlcyBmcm9tIGJhc2VsaW5lXG4gIHNob3VsZGVyVGlsdFRocmVzaG9sZDogMTAsIC8vIGRlZ3JlZXMgZnJvbSBiYXNlbGluZVxuICByZWNvdmVyeVRocmVzaG9sZDogMiwgLy8gZGVncmVlcyB0byByZXR1cm4gdG8gXCJnb29kXCJcbiAgY2FsaWJyYXRpb25TZWNvbmRzOiAzLCAvLyBuZXV0cmFsIGJhc2VsaW5lIGNhcHR1cmUgdGltZVxufTtcblxuY29uc3QgU1RBVEVfTEFCRUxTID0ge1xuICBDQUxJQlJBVElORzogXCJDYWxpYnJhdGluZ1wiLFxuICBHT09EOiBcIkdvb2QgcG9zdHVyZVwiLFxuICBXQVJOSU5HOiBcIkNoZWNrIHlvdXIgcG9zdHVyZVwiLFxuICBOT19QT1NFOiBcIk5vIHBvc2UgZGV0ZWN0ZWRcIixcbiAgUEFVU0VEOiBcIlBhdXNlZFwiLFxufTtcblxuZnVuY3Rpb24gQXBwKCkge1xuICBjb25zdCB3ZWJjYW0gPSB1c2VXZWJjYW0oKTtcbiAgY29uc3QgcG9zZSA9IHVzZVBvc2VMYW5kbWFya2VyKCk7XG4gIGNvbnN0IHBvc3R1cmUgPSB1c2VQb3N0dXJlU3RhdGVNYWNoaW5lKFNFVFRJTkdTKTtcblxuICBjb25zdCB7XG4gICAgYWN0aXZlLFxuICAgIHZpZGVvUmVmLFxuICAgIHN0YXJ0Q2FtZXJhLFxuICAgIHN0b3BDYW1lcmEsIFxuICAgIGVycm9yOiBjYW1lcmFFcnJvcixcbiAgfSA9IHdlYmNhbTtcbiAgY29uc3QgeyBzdGF0dXM6IHBvc2VTdGF0dXMsIGVycm9yOiBwb3NlRXJyb3IsIGRldGVjdCwgbGFuZG1hcmtzUmVmIH0gPSBwb3NlO1xuICBjb25zdCB7XG4gICAgc3RhcnRDYWxpYnJhdGlvbixcbiAgICBwYXVzZU1vbml0b3JpbmcsXG4gICAgcmVzZXRDYWxpYnJhdGlvbixcbiAgICBwcm9jZXNzTGFuZG1hcmtzLFxuICAgIHN0YXRlOiBwb3N0dXJlU3RhdGUsXG4gICAgbWVzc2FnZSxcbiAgICBpc3N1ZSxcbiAgICBzaG91bGRBbGVydCxcbiAgICBmb3JtYXRFbGFwc2VkLFxuICAgIHByb2dyZXNzLFxuICAgIGJhc2VsaW5lQ291bnQsXG4gIH0gPSBwb3N0dXJlO1xuXG4gIC8vIENhbGlicmF0aW9uIHN0YXJ0cyB3aXRoIHRoZSBjYW1lcmEsIGFuZCBtb25pdG9yaW5nIHN0b3BzIHdpdGggaXQuXG4gIHVzZUVmZmVjdCgoKSA9PiB7XG4gICAgaWYgKGFjdGl2ZSkge1xuICAgICAgc3RhcnRDYWxpYnJhdGlvbigpO1xuICAgIH0gZWxzZSB7XG4gICAgICBwYXVzZU1vbml0b3JpbmcoKTtcbiAgICB9XG4gIH0sIFthY3RpdmUsIHN0YXJ0Q2FsaWJyYXRpb24sIHBhdXNlTW9uaXRvcmluZ10pO1xuXG4gIC8vIFNpbmdsZSBkZXRlY3Rpb24gbG9vcDogcnVucyBvbmx5IHdoaWxlIHRoZSBjYW1lcmEgYW5kIHRoZSBtb2RlbCBhcmUgcmVhZHkuXG4gIHVzZUVmZmVjdCgoKSA9PiB7XG4gICAgaWYgKCFhY3RpdmUgfHwgcG9zZVN0YXR1cyAhPT0gXCJyZWFkeVwiKSByZXR1cm47XG5cbiAgICBsZXQgZnJhbWVJZCA9IDA7XG4gICAgbGV0IHN0b3BwZWQgPSBmYWxzZTtcblxuICAgIGNvbnN0IHRpY2sgPSAoKSA9PiB7XG4gICAgICBpZiAoc3RvcHBlZCkgcmV0dXJuO1xuXG4gICAgICBjb25zdCB2aWRlbyA9IHZpZGVvUmVmLmN1cnJlbnQ7XG4gICAgICBpZiAodmlkZW8gJiYgdmlkZW8ucmVhZHlTdGF0ZSA+PSAyICYmIHZpZGVvLnZpZGVvV2lkdGggPiAwKSB7XG4gICAgICAgIC8vIFBhc3NpbmcgbnVsbCBtYXJrcyB0aGUgcG9zZSBhcyB1bmF2YWlsYWJsZSBmb3IgdGhpcyBmcmFtZS5cbiAgICAgICAgcHJvY2Vzc0xhbmRtYXJrcyhkZXRlY3QodmlkZW8pIHx8IG51bGwpO1xuICAgICAgfVxuXG4gICAgICBmcmFtZUlkID0gcmVxdWVzdEFuaW1hdGlvbkZyYW1lKHRpY2spO1xuICAgIH07XG5cbiAgICB0aWNrKCk7XG5cbiAgICByZXR1cm4gKCkgPT4ge1xuICAgICAgc3RvcHBlZCA9IHRydWU7XG4gICAgICBjYW5jZWxBbmltYXRpb25GcmFtZShmcmFtZUlkKTtcbiAgICB9O1xuICB9LCBbYWN0aXZlLCBwb3NlU3RhdHVzLCBkZXRlY3QsIHByb2Nlc3NMYW5kbWFya3MsIHZpZGVvUmVmXSk7XG5cbiAgLy8gS2VlcCBhbiBhbGVydCB2aXNpYmxlIGZvciBhIGZldyBzZWNvbmRzIGluc3RlYWQgb2Ygb25lIGZyYW1lLlxuICBjb25zdCBbYWxlcnRNZXNzYWdlLCBzZXRBbGVydE1lc3NhZ2VdID0gdXNlU3RhdGUobnVsbCk7XG4gIGNvbnN0IGFsZXJ0VGltZXJSZWYgPSB1c2VSZWYoMCk7XG5cbiAgdXNlRWZmZWN0KCgpID0+IHtcbiAgICBpZiAoIXNob3VsZEFsZXJ0KSByZXR1cm47XG4gICAgc2V0QWxlcnRNZXNzYWdlKG1lc3NhZ2UpO1xuICAgIGNsZWFyVGltZW91dChhbGVydFRpbWVyUmVmLmN1cnJlbnQpO1xuICAgIGFsZXJ0VGltZXJSZWYuY3VycmVudCA9IHNldFRpbWVvdXQoKCkgPT4gc2V0QWxlcnRNZXNzYWdlKG51bGwpLCA2MDAwKTtcbiAgfSwgW3Nob3VsZEFsZXJ0LCBtZXNzYWdlXSk7XG5cbiAgdXNlRWZmZWN0KCgpID0+ICgpID0+IGNsZWFyVGltZW91dChhbGVydFRpbWVyUmVmLmN1cnJlbnQpLCBbXSk7XG5cbiAgY29uc3Qgc3RhdHVzVGV4dCA9IFNUQVRFX0xBQkVMU1twb3N0dXJlU3RhdGVdIHx8IHBvc3R1cmVTdGF0ZTtcblxuICByZXR1cm4gKFxuICAgIDxkaXYgY2xhc3NOYW1lPVwiYXBwXCI+XG4gICAgICA8aGVhZGVyIGNsYXNzTmFtZT1cImFwcC1oZWFkZXJcIj5cbiAgICAgICAgPGRpdj5cbiAgICAgICAgICA8aDE+U29tYTwvaDE+XG4gICAgICAgICAgPHAgY2xhc3NOYW1lPVwidGFnbGluZVwiPlxuICAgICAgICAgICAgUG9zdHVyZSBhd2FyZW5lc3MgZnJvbSB5b3VyIHdlYmNhbS4gRXZlcnl0aGluZyBydW5zIGxvY2FsbHkgaW4geW91clxuICAgICAgICAgICAgYnJvd3Nlci5cbiAgICAgICAgICA8L3A+XG4gICAgICAgIDwvZGl2PlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT17YHN0YXRlLWJhZGdlIHN0YXRlLSR7cG9zdHVyZVN0YXRlLnRvTG93ZXJDYXNlKCl9ICR7cG9zdHVyZVN0YXRlID09PSAnQ0FMSUJSQVRJTkcnID8gJ2FuaW1hdGUtcHVsc2UnIDogcG9zdHVyZVN0YXRlID09PSAnV0FSTklORycgPyAnYW5pbWF0ZS1ib3VuY2UnIDogJyd9YH0+XG4gICAgICAgICAge3N0YXR1c1RleHR9XG4gICAgICAgIDwvZGl2PlxuICAgICAgPC9oZWFkZXI+XG5cbiAgICAgIHthbGVydE1lc3NhZ2UgJiYgKFxuICAgICAgICA8ZGl2IHJvbGU9XCJhbGVydFwiIGNsYXNzTmFtZT1cImFsZXJ0LWJhbm5lciBhbmltYXRlLWFsZXJ0XCI+XG4gICAgICAgICAgPHN0cm9uZz5Qb3N0dXJlIGFsZXJ0PC9zdHJvbmc+XG4gICAgICAgICAgPHNwYW4+e2FsZXJ0TWVzc2FnZX08L3NwYW4+XG4gICAgICAgIDwvZGl2PlxuICAgICAgKX1cblxuICAgICAgPG1haW4gY2xhc3NOYW1lPVwiYXBwLW1haW4gYW5pbWF0ZS1ib3VuY2UtaW5cIj5cbiAgICAgICAgPENhbWVyYVBhbmVsXG4gICAgICAgICAgdmlkZW9SZWY9e3ZpZGVvUmVmfVxuICAgICAgICAgIGxhbmRtYXJrc1JlZj17bGFuZG1hcmtzUmVmfVxuICAgICAgICAgIGFjdGl2ZT17YWN0aXZlfVxuICAgICAgICAgIGVycm9yPXtjYW1lcmFFcnJvcn1cbiAgICAgICAgICBvblN0YXJ0PXtzdGFydENhbWVyYX1cbiAgICAgICAgICBvblN0b3A9e3N0b3BDYW1lcmF9XG4gICAgICAgICAgc3RhdHVzVGV4dD17XG4gICAgICAgICAgICBwb3NlU3RhdHVzID09PSBcInJlYWR5XCJcbiAgICAgICAgICAgICAgPyBwb3NlLnZpc2libGVcbiAgICAgICAgICAgICAgICA/IFwiUG9zZSBkZXRlY3RlZFwiXG4gICAgICAgICAgICAgICAgOiBcIk1vdmUgaW50byBmcmFtZVwiXG4gICAgICAgICAgICAgIDogcG9zZVN0YXR1cyA9PT0gXCJsb2FkaW5nXCJcbiAgICAgICAgICAgICAgICA/IFwiTG9hZGluZyBwb3NlIG1vZGVsLi4uXCJcbiAgICAgICAgICAgICAgICA6IFwiUG9zZSBtb2RlbCBmYWlsZWRcIlxuICAgICAgICAgIH1cbiAgICAgICAgLz5cblxuICAgICAgICA8YXNpZGUgY2xhc3NOYW1lPVwic2lkZS1wYW5lbCBhbmltYXRlLWZhZGUtaW5cIj5cbiAgICAgICAgICA8c2VjdGlvbiBjbGFzc05hbWU9XCJjYXJkXCI+XG4gICAgICAgICAgICA8aDI+Q3VycmVudCBwb3N0dXJlPC9oMj5cbiAgICAgICAgICAgIDxwIGNsYXNzTmFtZT17YHBvc3R1cmUtbWVzc2FnZSBwb3N0dXJlLSR7cG9zdHVyZVN0YXRlLnRvTG93ZXJDYXNlKCl9YH0+XG4gICAgICAgICAgICAgIHttZXNzYWdlfVxuICAgICAgICAgICAgPC9wPlxuICAgICAgICAgICAge2lzc3VlICYmIChcbiAgICAgICAgICAgICAgPHAgY2xhc3NOYW1lPVwiaXNzdWUtdGFnXCI+XG4gICAgICAgICAgICAgICAgSW5kaWNhdG9yOiB7aXNzdWUucmVwbGFjZUFsbChcIl9cIiwgXCIgXCIpLnRvTG93ZXJDYXNlKCl9XG4gICAgICAgICAgICAgIDwvcD5cbiAgICAgICAgICAgICl9XG5cbiAgICAgICAgICAgIHtwb3N0dXJlU3RhdGUgPT09IFwiQ0FMSUJSQVRJTkdcIiAmJiAoXG4gICAgICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwicHJvZ3Jlc3MgYW5pbWF0ZS1wdWxzZS1nbG93XCI+XG4gICAgICAgICAgICAgICAgPGRpdlxuICAgICAgICAgICAgICAgICAgY2xhc3NOYW1lPVwicHJvZ3Jlc3MtYmFyXCJcbiAgICAgICAgICAgICAgICAgIHN0eWxlPXt7IHdpZHRoOiBgJHtNYXRoLnJvdW5kKHByb2dyZXNzICogMTAwKX0lYCB9fVxuICAgICAgICAgICAgICAgIC8+XG4gICAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICAgKX1cblxuICAgICAgICAgICAgPGRsIGNsYXNzTmFtZT1cInN0YXRzXCI+XG4gICAgICAgICAgICAgIDxkaXY+XG4gICAgICAgICAgICAgICAgPGR0Pk1vbml0b3JpbmcgdGltZTwvZHQ+XG4gICAgICAgICAgICAgICAgPGRkPntmb3JtYXRFbGFwc2VkfTwvZGQ+XG4gICAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICAgICA8ZGl2PlxuICAgICAgICAgICAgICAgIDxkdD5CYXNlbGluZXMgcmVjb3JkZWQ8L2R0PlxuICAgICAgICAgICAgICAgIDxkZD57YmFzZWxpbmVDb3VudH08L2RkPlxuICAgICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgICAgPGRpdj5cbiAgICAgICAgICAgICAgICA8ZHQ+UG9zZSBtb2RlbDwvZHQ+XG4gICAgICAgICAgICAgICAgPGRkPntwb3NlU3RhdHVzID09PSBcInJlYWR5XCIgPyBcIlJlYWR5XCIgOiBwb3NlU3RhdHVzfTwvZGQ+XG4gICAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICAgPC9kbD5cblxuICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJjYXJkLWFjdGlvbnNcIj5cbiAgICAgICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgICAgIHR5cGU9XCJidXR0b25cIlxuICAgICAgICAgICAgICAgIGNsYXNzTmFtZT1cImJ0biBidG4tc2Vjb25kYXJ5XCJcbiAgICAgICAgICAgICAgICBvbkNsaWNrPXtyZXNldENhbGlicmF0aW9ufVxuICAgICAgICAgICAgICAgIGRpc2FibGVkPXshYWN0aXZlfVxuICAgICAgICAgICAgICA+XG4gICAgICAgICAgICAgICAgUmVjYWxpYnJhdGVcbiAgICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICA8L3NlY3Rpb24+XG5cbiAgICAgICAgICB7cG9zZUVycm9yICYmIChcbiAgICAgICAgICAgIDxzZWN0aW9uIGNsYXNzTmFtZT1cImNhcmQgY2FyZC1lcnJvclwiPlxuICAgICAgICAgICAgICA8aDI+UG9zZSBlbmdpbmU8L2gyPlxuICAgICAgICAgICAgICA8cD57cG9zZUVycm9yfTwvcD5cbiAgICAgICAgICAgIDwvc2VjdGlvbj5cbiAgICAgICAgICApfVxuXG4gICAgICAgICAgPHNlY3Rpb24gY2xhc3NOYW1lPVwiY2FyZCBjYXJkLW11dGVkXCI+XG4gICAgICAgICAgICA8aDI+SG93IGl0IHdvcmtzPC9oMj5cbiAgICAgICAgICAgIDxvbCBjbGFzc05hbWU9XCJoaW50LWxpc3RcIj5cbiAgICAgICAgICAgICAgPGxpPlN0YXJ0IHRoZSBjYW1lcmEgYW5kIGhvbGQgeW91ciBub3JtYWwgc2l0dGluZyBwb3NpdGlvbiBmb3IgMyBzZWNvbmRzLjwvbGk+XG4gICAgICAgICAgICAgIDxsaT5cbiAgICAgICAgICAgICAgICBTb21hIHN0b3JlcyB0aGF0IGFzIHlvdXIgbmV1dHJhbCBiYXNlbGluZSBhbmQgY29tcGFyZXMgZXZlcnkgZnJhbWVcbiAgICAgICAgICAgICAgICBhZ2FpbnN0IGl0LlxuICAgICAgICAgICAgICA8L2xpPlxuICAgICAgICAgICAgICA8bGk+XG4gICAgICAgICAgICAgICAgRm9yd2FyZCBsZWFuLCBzbG91Y2hpbmcgYW5kIHVuZXZlbiBzaG91bGRlcnMgYXJlIGZsYWdnZWQgYWZ0ZXIgNVxuICAgICAgICAgICAgICAgIHNlY29uZHMgb2Ygc3VzdGFpbmVkIGRldmlhdGlvbi5cbiAgICAgICAgICAgICAgPC9saT5cbiAgICAgICAgICAgIDwvb2w+XG4gICAgICAgICAgPC9zZWN0aW9uPlxuICAgICAgICA8L2FzaWRlPlxuICAgICAgPC9tYWluPlxuXG4gICAgICA8Zm9vdGVyIGNsYXNzTmFtZT1cImFwcC1mb290ZXJcIj5cbiAgICAgICAgUG9zdHVyZSBmZWVkYmFjayBvbmx5IC0gbm90IGEgbWVkaWNhbCBkZXZpY2UuXG4gICAgICA8L2Zvb3Rlcj5cbiAgICA8L2Rpdj5cbiAgKTtcbn1cblxuZXhwb3J0IGRlZmF1bHQgQXBwO1xuIl19

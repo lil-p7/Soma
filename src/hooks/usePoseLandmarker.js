@@ -1,86 +1,131 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  FilesetResolver,
-  PoseLandmarker,
-} from "@mediapipe/tasks-vision";
-// @ts-ignore - PoseLandmarkerOptions and VisionRunningMode are TypeScript type definitions
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 
+// Assets are vendored into /public so the app works without CDN access.
+const WASM_BASE = "/mediapipe/wasm";
+const MODEL_URL = "/models/pose_landmarker_lite.task";
+
+const VIDEO_MODE_OPTIONS = {
+  runningMode: "VIDEO",
+  numPoses: 1,
+  minPoseDetectionConfidence: 0.5,
+  minPosePresenceConfidence: 0.5,
+  minTrackingConfidence: 0.5,
+};
+
+/**
+ * Loads the MediaPipe Pose Landmarker in VIDEO mode.
+ *
+ * Returns a `detect(videoElement)` function that synchronously produces the
+ * landmarks of the first pose (33 landmarks) or null when no pose is visible.
+ * The latest landmarks are also kept in `landmarksRef` for canvas drawing so
+ * the render loop does not have to feed React state every frame.
+ */
 export function usePoseLandmarker() {
-  const [landmarks, setLandmarks] = useState(null);
-  const [confidence, setConfidence] = useState(0);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
   const [error, setError] = useState("");
-  const animationFrameRef = useRef(null);
+  const [detection, setDetection] = useState({ visible: false, confidence: 0 });
 
-  const resolveRef = useRef(null);
   const detectorRef = useRef(null);
-  const videoRef = useRef(null);
+  const landmarksRef = useRef(null);
+  const lastTimestampRef = useRef(0);
+  const lastStatsRef = useRef(0);
+  const detectionRef = useRef(detection);
+  detectionRef.current = detection;
 
   useEffect(() => {
-    if (!resolveRef.current) {
-      // Initialize FilesetResolver
-      FilesetResolver.fromUrl(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10/wasm/pose_landmarker.wasm"
-      ).then((resolver) => {
-        resolveRef.current = resolver;
+    let cancelled = false;
+    let detector = null;
 
-        // Initialize PoseLandmarker
-        const options = {
-          // @ts-ignore - TypeScript types for PoseLandmarkerOptions
-          baseOptions: {
-            modelAssetPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10/wasm/pose_landmarker_lite.task",
-            runningMode: "VIDEO",
-            numPoses: 1,
-          },
-          runningMode: "VIDEO",
-          minPoseDetectionConfidence: 0.5,
-          minPosePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-        };
+    async function init() {
+      try {
+        const resolver = await FilesetResolver.forVisionTasks(WASM_BASE);
+        detector = await PoseLandmarker.createFromOptions(resolver, {
+          baseOptions: { modelAssetPath: MODEL_URL },
+          ...VIDEO_MODE_OPTIONS,
+        });
 
-        detectorRef.current = PoseLandmarker.createFromOptions(resolver, options);
-      });
-    }
-  }, []);
+        if (cancelled) {
+          detector.close();
+          return;
+        }
 
-  // Function to detect pose from video element
-  const detectFromVideo = (videoElement) => {
-    if (!detectorRef.current || !videoElement) return;
-
-    try {
-      // PoseLandmarker expects VIDEO mode, detectForVideo takes the video and timestamp
-      const timestamp = performance.now();
-      const detection = detectorRef.current.detectForVideo(videoElement, timestamp);
-
-      if (detection.landmarks) {
-        setLandmarks(detection.landmarks);
-        // Calculate average confidence from landmarks
-        const scores = detection.landmarks
-          .flat()
-          .map((l) => l.score || 0);
-        const avgConfidence =
-          scores.length > 0
-            ? scores.reduce((a, b) => a + b, 0) / scores.length
-            : 0;
-        setConfidence(avgConfidence);
-      } else {
-        setLandmarks(null);
-        setConfidence(0);
+        detectorRef.current = detector;
+        setStatus("ready");
+      } catch (err) {
+        if (cancelled) return;
+        setStatus("error");
+        setError(
+          `Could not load the pose model: ${err?.message || String(err)}`
+        );
       }
-    } catch (err) {
-      setError("Pose detection error: " + err);
-      setLandmarks(null);
-      setConfidence(0);
     }
-  };
 
-  // Cleanup on unmount
-  useEffect(() => {
+    init();
+
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      cancelled = true;
+      detectorRef.current?.close?.();
+      detectorRef.current = null;
     };
   }, []);
 
-  return { landmarks, confidence, error, detectFromVideo };
+  const detect = useCallback((videoElement) => {
+    const detector = detectorRef.current;
+
+    if (!detector || !videoElement || videoElement.readyState < 2) {
+      return null;
+    }
+
+    // Timestamps passed to detectForVideo must be strictly increasing.
+    const timestamp = performance.now();
+    if (timestamp <= lastTimestampRef.current) {
+      return landmarksRef.current;
+    }
+    lastTimestampRef.current = timestamp;
+
+    try {
+      const result = detector.detectForVideo(videoElement, timestamp);
+      const pose = result?.landmarks?.[0] || null;
+      landmarksRef.current = pose;
+
+      // Throttle React updates: the drawing loop uses landmarksRef instead.
+      if (timestamp - lastStatsRef.current > 200) {
+        lastStatsRef.current = timestamp;
+        const scores = pose
+          ? pose.map((landmark) =>
+              Number.isFinite(landmark.visibility) ? landmark.visibility : 0
+            )
+          : [];
+        const confidence =
+          scores.length > 0
+            ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+            : 0;
+
+        const next = { visible: !!pose, confidence };
+        const prev = detectionRef.current;
+        if (
+          prev.visible !== next.visible ||
+          Math.abs(prev.confidence - next.confidence) > 0.02
+        ) {
+          setDetection(next);
+        }
+      }
+
+      return pose;
+    } catch (err) {
+      landmarksRef.current = null;
+      setError(`Pose detection failed: ${err?.message || String(err)}`);
+      return null;
+    }
+  }, []);
+
+  return {
+    status,
+    error,
+    detect,
+    landmarksRef,
+    visible: detection.visible,
+    confidence: detection.confidence,
+  };
 }

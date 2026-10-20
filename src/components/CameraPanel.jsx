@@ -1,88 +1,159 @@
 import { useEffect, useRef } from "react";
-import { useWebcam } from "../hooks/useWebcam";
 
-export default function CameraPanel({ onFrame }) {
-  const webcam = useWebcam();
-  const { videoRef, active, startCamera, stopCamera, error } = webcam;
+// Skeleton edges drawn on top of the video for quick visual feedback.
+const CONNECTIONS = [
+  [11, 12],
+  [11, 13],
+  [13, 15],
+  [12, 14],
+  [14, 16],
+  [11, 23],
+  [12, 24],
+  [23, 24],
+  [23, 25],
+  [25, 27],
+  [24, 26],
+  [26, 28],
+];
 
-  // Call onFrame when video plays
+/*
+ * Animation constants for pose landmarks
+ */
+const LANDMARK_COLOR_VISIBLE = "rgba(56, 189, 248, 0.9)";
+const LANDMARK_COLOR_LOW_VIS = "rgba(244, 114, 182, 0.95)";
+
+
+/**
+ * Camera preview with a live pose overlay.
+ *
+ * Holds no business logic: the parent owns the webcam hook and the detection
+ * loop, this component only renders the video plus the landmarks it is given.
+ */
+export default function CameraPanel({
+  videoRef,
+  landmarksRef,
+  active,
+  error,
+  onStart,
+  onStop,
+  statusText,
+}) {
+  const canvasRef = useRef(null);
+
   useEffect(() => {
-    if (!onFrame || !videoRef.current) return;
+    if (!active) return;
 
-    const videoElement = videoRef.current;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
 
-    // Set up canvas for pose landmark drawing
-    const canvasRef = useRef(null);
-    let isRunning = true;
+    const ctx = canvas.getContext("2d");
+    let frameId = 0;
+    let stopped = false;
 
-    useEffect(() => {
-      const canvas = document.createElement("canvas");
-      canvasRef.current = canvas;
-      canvas.style.position = "absolute";
-      canvas.style.top = 0;
-      canvas.style.left = 0;
-      canvas.style.zIndex = "10";
-      canvas.style.width = "100%";
-      canvas.style.height = "auto";
-      videoElement.parentNode.appendChild(canvas);
+    const draw = () => {
+      if (stopped) return;
 
-      const updateFrame = () => {
-        if (!isRunning) return;
-
-        // Resize canvas to match video
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
-
-        // Draw video frame on canvas
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      if (video.videoWidth > 0) {
+        if (
+          canvas.width !== video.videoWidth ||
+          canvas.height !== video.videoHeight
+        ) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
         }
 
-        // Call onFrame with video element for pose processing
-        onFrame(videoElement);
-        requestAnimationFrame(updateFrame);
-      };
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      updateFrame();
+        const landmarks = landmarksRef.current;
+        if (landmarks && landmarks.length) {
+          const toPoint = (index) => ({
+            x: landmarks[index].x * canvas.width,
+            y: landmarks[index].y * canvas.height,
+          });
 
-      return () => {
-        isRunning = false;
-        if (canvasRef.current && canvasRef.current.parentNode) {
-          canvasRef.current.parentNode.removeChild(canvasRef.current);
+          ctx.lineWidth = Math.max(2, canvas.width / 240);
+          ctx.strokeStyle = LANDMARK_COLOR_VISIBLE;
+          ctx.beginPath();
+          CONNECTIONS.forEach(([from, to]) => {
+            if (!landmarks[from] || !landmarks[to]) return;
+            const a = toPoint(from);
+            const b = toPoint(to);
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+          });
+          ctx.stroke();
+
+          ctx.fillStyle = LANDMARK_COLOR_LOW_VIS;
+          landmarks.forEach((landmark) => {
+            if (Number.isFinite(landmark.visibility) && landmark.visibility < 0.4) {
+              return;
+            }
+            ctx.beginPath();
+            ctx.arc(
+              landmark.x * canvas.width,
+              landmark.y * canvas.height,
+              Math.max(2, canvas.width / 200),
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+          });
         }
-      };
-    }, [videoElement, onFrame]);
+      }
+
+      frameId = requestAnimationFrame(draw);
+    };
+
+    draw();
 
     return () => {
-      stopCamera();
+      stopped = true;
+      cancelAnimationFrame(frameId);
     };
-  }, [onFrame, startCamera, stopCamera]);
+  }, [active, videoRef, landmarksRef]);
 
   return (
-    <section>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ width: "100%", borderRadius: 12, background: "#000" }}
-      />
-      {error && <p role="alert" style={{ marginTop: 8, color: "red" }}>
-        {error}
-      </p>}
-      {!active ? (
-        <button onClick={startCamera}
-          style={{ marginTop: 8, padding: "8px 16px" }}>
-          Start camera
-        </button>
-      ) : (
-        <button onClick={stopCamera}
-          style={{ marginTop: 8, padding: "8px 16px", marginLeft: 8 }}>
-          Stop camera
-        </button>
+    <section className="camera-panel">
+      <div className="camera-stage">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`camera-video${active ? "" : " is-hidden"}`}
+        />
+        {active && <canvas ref={canvasRef} className="camera-overlay" />}
+
+        {!active && (
+          <div className="camera-placeholder">
+            <p>Camera is off</p>
+            <span>Your video never leaves this browser.</span>
+          </div>
+        )}
+
+        {active && statusText && (
+          <div className="camera-badge">{statusText}</div>
+        )}
+      </div>
+
+      {error && (
+        <p role="alert" className="camera-error">
+          {error}
+        </p>
       )}
+
+      <div className="camera-actions">
+        {active ? (
+          <button type="button" className="btn btn-secondary" onClick={onStop}>
+            Stop camera
+          </button>
+        ) : (
+          <button type="button" className="btn btn-primary" onClick={onStart}>
+            Start camera
+          </button>
+        )}
+      </div>
     </section>
   );
 }
